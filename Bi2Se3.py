@@ -1,4 +1,8 @@
+#-*- coding: utf-8 -*-
+
+
 import numpy as np
+
 
 def rhombo(a, alpha):
     c = np.cos(alpha)
@@ -8,14 +12,17 @@ def rhombo(a, alpha):
     cell = np.array([[a*tx, -a*ty, a*tz], [0, 2.0*a*ty, a*tz], [-a*tx, -a*ty, a*tz]], dtype = 'float')
     return cell 
 
+
 def rhombo_to_hexa(cell_r):
     T = np.array([[1, 0, -1], [-1, 1, 0], [1, 1, 1]], dtype = 'float')
     cell_h = np.dot(T, cell_r)
     return cell_h
 
+
 def reciprocal(cell):
     recp = np.array([np.cross(cell[1],cell[2]), np.cross(cell[2],cell[0]), np.cross(cell[0],cell[1])], dtype = 'float')
     return recp/np.linalg.det(cell)
+
 
 def get_supercell_card(atom_name, vec, cell, supercell):
     Nmax = 3; Nmin = -3
@@ -35,6 +42,7 @@ def get_supercell_card(atom_name, vec, cell, supercell):
                     card.append([atom_name, vec_supercell[0], vec_supercell[1], vec_supercell[2]])
     return card
 
+
 def get_Bi2X3_3QL_card(a, alpha, u, v, X):
     card = []
     rhom = rhombo(a, alpha)
@@ -47,3 +55,7 @@ def get_Bi2X3_3QL_card(a, alpha, u, v, X):
     print('ATOMIC_POSITIONS angstrom')
     for ln in card:
         print('%4s %f %f %f' %(ln[0], ln[1], ln[2], ln[3]))
+
+
+if __name__ == "__main__":
+    get_Bi2X3_3QL_card(9.841, 24.27*(np.pi/180.0), 0.4, 0.21, X='Se')

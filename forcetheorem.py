@@ -1,3 +1,6 @@
+#-*- coding: utf-8 -*-
+
+
 def convert_ns_noncolin(nat, ldim, dir=None):
     if (dir == None):
         fn = './occup.txt'
@@ -22,6 +25,7 @@ def convert_ns_noncolin(nat, ldim, dir=None):
     for i in range(ntot*2):
         print('(%E,%E)' %(ns_nc[i].real, ns_nc[i].imag))
 
+
 def get_eband_tot(fn):
     with open(fn, 'r') as f:
         fl = f.readlines()
@@ -32,6 +36,7 @@ def get_eband_tot(fn):
             eband_proj_tot = float(ln.split()[5])
     return eband_tot, eband_proj_tot
 
+
 def get_eband(fn):
     with open(fn, 'r') as f:
         fl = f.readlines()
@@ -41,3 +46,14 @@ def get_eband(fn):
             eband = float(ln.split()[4])
             Ef = float(ln.split()[5])
     return eband, Ef
+
+
+if __name__ == "__main__":
+    dir = './data/'
+    eband_x, ef_x = get_eband(dir+'x.out')
+    eband_y, ef_y = get_eband(dir+'y.out')
+    eband_z, ef_z = get_eband(dir+'z.out')
+
+    print('Ex-Ez (meV) : %f' %((eband_x - eband_z)*1000))
+    print('Ey-Ez (meV) : %f' %((eband_y - eband_z)*1000))
+    print('Ex-Ey (meV) : %f' %((eband_x - eband_y)*1000))
