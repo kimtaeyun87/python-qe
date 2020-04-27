@@ -2,6 +2,7 @@
 
 
 import f90nml
+import numpy as np
 
 
 def readcard(lines, i, n):
@@ -11,18 +12,10 @@ def readcard(lines, i, n):
         if len(lines[i].split()) == 1:
             tag = lines[i].lower().rstrip()
             opt = ""
+
     data = lines[i+1:i+1+n]
+
     return tag, opt, data
-
-
-def checkload(data):
-    if isinstance(data, list):
-        if len(data) == 0:
-            return False
-        else:
-            return True
-    else:
-        raise TypeError
 
 
 def readpwscfin(fpath):
@@ -34,18 +27,18 @@ def readpwscfin(fpath):
     with open(fpath) as f:
         lines = f.readlines()
 
-    atomtype   = []
-    atommass   = []
-    atompseudo = []
+    typelabel  = []
+    typemass   = []
+    typepseudo = []
 
-    atomlist   = []
-    atompos    = []
+    atomlabel  = []
+    atompos    = np.zeros((numatom, 3))
     atomposopt = ""
 
-    cell       = []
-    cellopt    = ""
+    cell    = np.zeros((3, 3))
+    cellopt = ""
 
-    extforce   = []
+    atomforce   = np.zeros((numatom, 3))
 
     kptgrid    = []
     kptlist    = []
@@ -53,36 +46,33 @@ def readpwscfin(fpath):
     numkpt     = 0
 
     for i in range(len(lines)):
-        cardhead = lines[i].lower().rstrip()
+        head = lines[i].lower().rstrip()
 
-        if "atomic_species" in cardhead:
+        if "atomic_species" in head:
             tag, opt, data = readcard(lines, i, numtype)
 
             for j in range(numtype):
-                atomtype.append(data[j].split()[0])
-                atommass.append(float(data[j].split()[1]))
-                atompseudo.append(data[j].split()[2])
+                typelabel.append(data[j].split()[0])
+                typemass.append(float(data[j].split()[1]))
+                typepseudo.append(data[j].split()[2])
 
-        elif "atomic_positions" in cardhead:
+        elif "atomic_positions" in head:
             tag, opt, data = readcard(lines, i, numatom)
-
-            atomposopt = opt
+            posopt = opt
 
             for j in range(numatom):
-                atomlist.append(data[j].split()[0])
-                atompos.append([float(x) for x in data[j].split()[1:]])
+                atomlabel.append(data[j].split()[0])
+                atompos[j, :] = np.array([float(x) for x in data[j].split()[1:]])
 
-        elif "cell_parameters" in cardhead:
+        elif "cell_parameters" in head:
             tag, opt, data = readcard(lines, i, 3)
-
             cellopt = opt
 
             for j in range(3):
-                cell.append([float(x) for x in data[j].split()])
+                cell[j, :] = np.array([float(x) for x in data[j].split()])
 
-        elif "k_points" in cardhead:
+        elif "k_points" in head:
             tag, opt, data = readcard(lines, i, 0)
-
             kptopt = opt
 
             if opt == "gamma":
@@ -91,7 +81,7 @@ def readpwscfin(fpath):
             elif opt == "automatic":
                 _, _, data = readcard(lines, i, 1)
 
-                kptgrid += [int(x) for x in data[0].split()]
+                kptgrid = [int(x) for x in data[0].split()]
 
             else:
                 _, _, data = readcard(lines, i, 1)
@@ -101,13 +91,13 @@ def readpwscfin(fpath):
                 _, _, data = readcard(lines, i, numkpt+1)
 
                 for j in range(1, numkpt+1):
-                    kptlist.append([float(x) for x in data[j].split()])
+                    kptlist.append(np.array([float(x) for x in data[j].split()]))
 
-        elif "atomic_forces" in cardhead:
+        elif "atomic_forces" in head:
             tag, opt, data = readcard(lines, i, numatom)
 
             for j in range(numatom):
-                extforce.append([float(x) for x in data[j].split()[1:]])
+                atomforce[j, :] = np.array([float(x) for x in data[j].split()[1:]])
 
         else:
             continue
@@ -117,11 +107,11 @@ def readpwscfin(fpath):
     # atomic_species, atomic_positions and k_points
 
     card = {}
-    card["atomic_species"]   = {"type": atomtype, "mass": atommass, "pseudo": atompseudo}
-    card["atomic_positions"] = {"opt": atomposopt, "list": atomlist, "pos": atompos}
-    card["k_points"]         = {"opt": kptopt, "nkpt": numkpt, "grid": kptgrid, "list": kptlist}
-    card["cell_parameters"]  = {"opt": cellopt, "cell": cell}
-    card["atomic_forces"]    = {"list": atomlist, "extforce": extforce}
+    card["atomic_species"]   = {"label": typelabel, "mass": typemass, "pseudo": typepseudo}
+    card["atomic_positions"] = {"option": atomposopt, "label": atomlabel, "position": atompos}
+    card["k_points"]         = {"option": kptopt, "number": numkpt, "grid": kptgrid, "list": kptlist}
+    card["cell_parameters"]  = {"option": cellopt, "cell": cell}
+    card["atomic_forces"]    = {"label": atomlabel, "force": atomforce}
 
     return nml, card
 
@@ -129,7 +119,7 @@ def readpwscfin(fpath):
 def printpwscfin(nml, card):
     print(nml)
 
-    headform = "{:s} {:s}"
+    headform = "\n{:s} {:s}"
 
     numatom = int(nml["system"]["nat"])
     numtype = int(nml["system"]["ntyp"])
@@ -137,21 +127,21 @@ def printpwscfin(nml, card):
     tag = "atomic_species"
     print(headform.format(tag, "").rstrip())
     for i in range(numtype):
-        x      = card[tag]["type"][i]
+        x      = card[tag]["label"][i]
         mass   = card[tag]["mass"][i]
         pseudo = card[tag]["pseudo"][i]
-        print(f"    {x:4s}    {mass:8f}    {pseudo:80s}".rstrip())
+        print(f"{x:4s}{mass:8.3f}{'':4s}{pseudo:80s}".rstrip())
 
     tag = "atomic_positions"
-    opt = card[tag]["opt"]
+    opt = card[tag]["option"]
     print(headform.format(tag, opt).rstrip())
     for i in range(numatom):
-        x   = card[tag]["list"][i]
-        pos = card[tag]["pos"][i]
-        print(f"    {x:4s}" + "".join(f"    {y:8f}" for y in pos).rstrip())
+        x   = card[tag]["label"][i]
+        pos = card[tag]["position"][i]
+        print(f"{x:4s}" + "".join(f"{y:16.8f}" for y in pos).rstrip())
 
     tag = "k_points"
-    opt = card[tag]["opt"]
+    opt = card[tag]["option"]
     print(headform.format(tag, opt).rstrip())
     if opt == "gamma":
         pass
@@ -159,11 +149,18 @@ def printpwscfin(nml, card):
         kptgrid = card[tag]["grid"]
         print("".join(f"{x:4d}" for x in kptgrid).rstrip())
     else:
-        numkpt = card[tag]["nkpt"]
+        numkpt = card[tag]["number"]
         print(f"{numkpt:4d}")
         for i in range(numkpt):
             kpt = card[tag]["list"][i]
-            print("".join(f"    {x:8f}" for x in kpt).rstrip())
+            print("".join(f"{x:16.8f}" for x in kpt).rstrip())
+
+    tag = "cell_parameters"
+    opt = card[tag]["option"]
+    print(headform.format(tag, opt).rstrip())
+    for i in range(3):
+        a = card[tag]["cell"][i]
+        print(f"{a[0]:16.8f}{a[1]:16.8f}{a[2]:16.8f}".rstrip())
 
 
 if __name__ == "__main__":
