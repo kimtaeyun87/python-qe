@@ -1,7 +1,8 @@
 #-*- coding: utf-8 -*-
 
+
+import numpy as np
 import subprocess
-import matplotlib.pyplot as plt
 
 
 def grep(key, fpath, *args):
@@ -11,26 +12,32 @@ def grep(key, fpath, *args):
     return stdout
 
 
-def readatomicmoment(lines, n=0):
-    m = []
+def readatomicmoment(fpath, n=0):
+    with open(fpath) as f:
+        lines = f.readlines()
 
+    m = []
     for i in range(len(lines)):
         if all(x in lines[i] for x in ["atomic", "mx", "my", "mz"]):
             _, _, _, _, _, mx, my, mz = lines[i].split()
             m.append([float(x) for x in [mx, my, mz]])
-    
-    return m[-n:]
+    return np.array(m[-n:])
 
 
-def readconstrainedmoment(lines, n=0):
+def readconstrainedmoment(fpath, n=0):
+    with open(fpath) as f:
+        lines = f.readlines()
+
     m = []
-
     for i in range(len(lines)):
         if all(x in lines[i] for x in ["constrained", "moment"]):
             _, _, _, mx, my, mz = lines[i].split()
-            m.append([float(x) for x in [mx, my, mz]])
-
-    return m[-n:]
+            mi = np.array([float(x) for x in [mx, my, mz]])
+            if np.isclose(np.linalg.norm(mi), 0.0):
+                m.append(np.zeros(3))
+            else:
+                m.append(mi/np.linalg.norm(mi))
+    return np.array(m[-n:])
 
 
 if __name__ == "__main__":
@@ -48,7 +55,7 @@ if __name__ == "__main__":
     efermi   = 0.0
     totram   = (0.0, "MB")
 
-    magmom = readatomicmoment(lines)
+    magmom = readatomicmoment(name)
 
     for i in range(len(lines)):
         #if all(x in lines[i] for x in ["atomic", "mx", "my", "mz"]):

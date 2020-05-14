@@ -1,6 +1,7 @@
 #-*- coding: utf-8 -*-
 
 
+import copy
 import numpy as np
 
 
@@ -13,7 +14,7 @@ atomsymtonum = {
     "Sb": 51, "Te": 52, "I": 53, "Xe": 54, "Cs": 55, "Ba": 56, "La": 57, "Ce": 58, "Pr": 59, "Nd": 60,
     "Pm": 61, "Sm": 62, "Eu": 63, "Gd": 64, "Tb": 65, "Dy": 66, "Ho": 67, "Er": 68, "Tm": 69, "Yb": 70,
     "Lu": 71, "Hf": 72, "Ta": 72, "W": 74, "Re": 75, "Os": 76, "Ir": 77, "Pt": 78, "Au": 79, "Hg": 80,
-    "Ti": 81, "Pb": 82, "Bi": 83, "Po": 84, "At": 85, "Rn": 86, "Fr": 87, "Ra": 88, "Ac": 89, "Th": 90,
+    "Tl": 81, "Pb": 82, "Bi": 83, "Po": 84, "At": 85, "Rn": 86, "Fr": 87, "Ra": 88, "Ac": 89, "Th": 90,
     "Pa": 91, "U": 92, "Np": 93, "Pu": 94
     }
 
@@ -36,12 +37,12 @@ def celldm2cell(celldm):
     return a
 
 
-def cell2celldm(s):
-    A, B, C = [np.linalg.norm(s[i, :]) for i in range(3)]
+def cell2celldm(a):
+    A, B, C = [np.linalg.norm(a[i, :]) for i in range(3)]
 
-    cosbc = np.dot(s[1, :]/B, s[2, :]/C)
-    cosac = np.dot(s[0, :]/A, s[2, :]/C)
-    cosab = np.dot(s[0, :]/A, s[1, :]/B)
+    cosbc = np.dot(a[1, :]/B, a[2, :]/C)
+    cosac = np.dot(a[0, :]/A, a[2, :]/C)
+    cosab = np.dot(a[0, :]/A, a[1, :]/B)
 
     radtodeg = 180.0/np.pi
 
@@ -71,8 +72,8 @@ def getReciprocal(a):
 
 
 def getGvector(a, g):
-    a = np.array(a).astype(float)
-    g = np.array(g).astype(int)
+    a = np.array(a)
+    g = np.array(g, dtype=int)
     b = getReciprocal(a)
     return np.dot(b, g)
 
@@ -102,20 +103,35 @@ def readVestaxtl(fpath):
         atompos = np.mod(atompos, [1.0, 1.0, 1.0])
 
     cell = celldm2cell(celldm)
-    out = {}
-    out["cell_parameters"] = {"option": "angstrom", "cell": cell}
-    out["atomic_positions"] = {"option": "crystal", "position": atompos, "label": atomlabel}
 
-    return out
+    card = {}
+    card["cell_parameters"] = {"option": "angstrom", "cell": cell}
+    card["atomic_positions"] = {"option": "crystal", "position": atompos, "label": atomlabel}
+
+    return card
 
 
 def writexsf(f, a, l, v, mode="crystal"):
-    """
+    """ Write a xsf (xcrysden) file
+
     Args:
+
         f: File object
-        a: Primitive cell
-        l: Atom label
-        v: Atomic coordinates
+
+        a (3x3 array): Primitive cell
+           [a1x, a1y, a1z]
+           [a2x, a2y, a2z]
+           [a3x, a3y, a3z]
+
+        l (list): Atom label
+
+        v (nx3 array): Atomic positions in Cartesian coordinate
+           [v1x, v1y, v1z]
+           [v2x, v2y, v2z]
+                  :
+                  :
+           [vnx, vny, vnz]
+
         mode: "crystal", "slab", "polymer", "dot". Default to "crystal"
 
     See also:
@@ -143,20 +159,18 @@ def writexsf(f, a, l, v, mode="crystal"):
 
 
 def cart2crys(a, v):
-    """
+    """Convert Cartesian coordinates to crystal coordinates.
+
     Args:
-        a[i, x]: (3, 3) array_like
-            Unitcell
-        v[n, x]: (N, 3) array_like
-            Atomic positions in cartesian coordinate
+        a (array): Unitcell.
+        v (array): Atomic positions in Cartesian coordinates.
 
     Returns:
-        w[n, i]: (N, 3) array_like
-            Atomic positions in crystal coordinate
+        w (array): Atomic positions in crystal coordinates.
 
     See also:
-        b[x, i]: (3, 3) array_like
-            Reciprocal unitcell
+        b (array): Reciprocal unitcell.
+
         w[n, i] = sum_x v[n, i]*b[x, i]
 
         n: atom index
@@ -168,20 +182,18 @@ def cart2crys(a, v):
     b = getReciprocal(a)
     w = np.dot(v, b)
 
-    return w
+    return np.mod(w, [1.0, 1.0, 1.0])
 
 
 def crys2cart(a, w):
-    """
+    """Convert crystal coordinates to Cartesian coordinates.
+
     Args:
-        a[i, x]: (3, 3) array_like
-            Unitcell
-        w[n, i]: (N, 3) array_like
-            Atomic positions in crystal coordinate
+        a (array): Unitcell.
+        w (array): Atomic positions in crystal coordinate.
 
     Returns:
-        v[n, x]: (N, 3) array_like
-            Atomic positions in cartesian coordinate
+        v (array): Atomic positions in Cartesian coordinate.
 
     See also:
         v[n, x] = sum_i w[n, i]*a[i, x]
@@ -198,25 +210,22 @@ def crys2cart(a, w):
 
 
 def getSurfaceCell(a, g):
-    """
+    """Get new unitcell vectors that are compatible with the given miller index.
+
     Args:
-        a[i, x]: (3, 3) array_like
-            Cell
-        g: (3) array_like
-            Miller index
+        a (array): Unitcell.
+        g (array): Miller index.
+
     Returns:
-        asurf[i, x]: (3, 3) array_like
-            Surface cell
+        asurf (array-like): A surface unitcell.
     """
     a = np.array(a)
-    g = np.array(g, dtype=np.int32)
+    g = np.array(g).astype(int)
     g = g//np.gcd.reduce(g)
 
     asurf = np.zeros((3, 3))
 
     if np.linalg.det(a) < 0: raise ValueError("det(a) < 0")
-
-    b = getReciprocal(a)
 
     if g[0] == 0 and g[1] == 0 and g[2] == 0:
         raise ValueError
@@ -278,8 +287,13 @@ def getSurfaceCell(a, g):
 def collectAtom(a, p, l, v, ns=1):
     """
     """
-    p1 = np.amin(p, axis=0).astype(int) - ns
-    p2 = np.amax(p, axis=0).astype(int) + ns
+    a = np.array(a)
+    p = np.array(p)
+    l = copy.deepcopy(l)
+    v = np.array(v)
+
+    p1 = np.array(np.amin(p, axis=0), dtype=int) - ns
+    p2 = np.array(np.amax(p, axis=0), dtype=int) + ns
 
     L = []
     V = []
@@ -298,6 +312,11 @@ def collectAtom(a, p, l, v, ns=1):
 def reduceAtom(a, p, L, V):
     """
     """
+    a = np.array(a)
+    p = np.array(p)
+    L = copy.deepcopy(L)
+    V = np.array(V)
+
     p1 = np.amin(p, axis=0).astype(float)
     p2 = np.amax(p, axis=0).astype(float)
 
@@ -318,46 +337,69 @@ def reduceAtom(a, p, L, V):
     return l, v
 
 
-def convertCell(X1, a2):
+def convertCell(a1, l1, v1, a2):
     """
     """
-    a1, l1, v1 = X1
+    a1 = np.array(a1)
+    l1 = copy.deepcopy(l1)
+    v1 = np.array(v1)
+    a2 = np.array(a2)
+
     b1 = getReciprocal(a1)
     p21 = np.dot(a2, b1)
+
     L, V = collectAtom(a1, p21, l1, v1)
+
     p = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
     l2, v2 = reduceAtom(a2, p, L, V)
+
     return a2, l2, v2
 
 
-def transformCoordinate(X1, a2):
+def transformCoordinate(a1, l1, v1, a2):
     """
     """
-    a1, l1, v1 = X1
+    a1 = np.array(a1)
+    l1 = copy.deepcopy(l1)
+    v1 = np.array(v1)
+    a2 = np.array(a2)
+
     l2 = l1
     r12 = np.dot(np.linalg.inv(a1), a2)
     v2 = np.dot(v1, r12)
+
     return a2, l2, v2
 
 
-def changeBoundary(X, p):
+def changeBoundary(a, l, v, p):
     """
     """
-    a, l, v = X
+    a = np.array(a)
+    l = copy.deepcopy(l)
+    v = np.array(v)
+    p = np.array(p)
+
     L, V = collectAtom(a, p, l, v)
     l, v = reduceAtom(a, p, L, V)
     return a, l, v
 
 
-def makeSlab(X, wmin, wmax, woff, dgap):
+def makeSlab(a, l, v, wmin, wmax, woff, dgap):
     """
     """
+    a = np.array(a)
+    l = copy.deepcopy(l)
+    v = np.array(v)
+
     p = np.array([[0, 0, wmin], [1, 1, wmax]])
     t = np.array([0, 0, woff])
-    a, l, v = changeBoundary(X, p+t)
+
+    a, l, v = changeBoundary(a, l, v, p+t)
+
     w = cart2crys(a, v)
     w -= t
     v = crys2cart(a, w)
+
     dsurf = a[2, 2]
     a[2, :]  = np.array([0.0, 0.0, (wmax - wmin)*dsurf + dgap])
     return a, l, v
@@ -366,10 +408,10 @@ def makeSlab(X, wmin, wmax, woff, dgap):
 if __name__ == "__main__":
 
     np.set_printoptions(formatter={
-        "float": lambda x: "{:15.8f}".format(x),
+        "float": lambda x: "{:16.8f}".format(x),
         "int": lambda x: "{:4d}".format(x)})
 
-    # Build a 3QL slab of Bi2Se3
+    # 1. Build a 3QL slab of Bi2Se3
     import Bi2Se3
 
     aprim = Bi2Se3.rhombo(9.841, 24.27*np.pi/180.0)
@@ -395,14 +437,33 @@ if __name__ == "__main__":
     gsurf = [1, 1, 1]
     Gsurf = getGvector(aprim, gsurf)
     asurf = getSurfaceCell(aprim, gsurf)
-    Xsurf = convertCell(Xprim, asurf)
+    Xsurf = convertCell(*Xprim, asurf)
 
     # Coordinate transformation
-    Xsurf = transformCoordinate(Xsurf, standardizeCell(asurf))
+    Xsurf = transformCoordinate(*Xsurf, standardizeCell(asurf))
 
     # Make slab
-    wmin, wmax, woff, gap = -1.0, 1.0, 0.5, 20.0
-    Xslab = makeSlab(Xsurf, wmin, wmax, woff, gap)
+    wmin, wmax, woff, gap = -1.5, 1.5, 0.0, 20.0
+    Xslab = makeSlab(*Xsurf, wmin, wmax, woff, gap)
+
+    with open("tmp.xsf", 'w') as f:
+        writexsf(f, *Xslab, mode="slab")
+    import subprocess
+    subprocess.call(["/home/kimtaeyun/xcrysden/1.6.2/xcrysden", "--xsf", "tmp.xsf"])
+    subprocess.call(["rm", "-f", "/tmp/tmp.xsf"])
+
+
+    # 2. Build a BL NiPS3
+    card = readVestaxtl("test/slab_test.xtl")
+    a = card["cell_parameters"]["cell"]
+    w = card["atomic_positions"]["position"]
+    l = card["atomic_positions"]["label"]
+    v = crys2cart(a, w)
+    
+
+    Xsurf = (a, l, v)
+    wmin, wmax, woff, dgap = -1.0, 1.0, 0.5, 20.0
+    Xslab = makeSlab(*Xsurf, wmin, wmax, woff, dgap)
 
     with open("tmp.xsf", 'w') as f:
         writexsf(f, *Xslab, mode="slab")

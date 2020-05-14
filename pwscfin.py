@@ -58,7 +58,7 @@ def readpwscfin(fpath):
 
         elif "atomic_positions" in head:
             tag, opt, data = readcard(lines, i, numatom)
-            posopt = opt
+            atomposopt = opt
 
             for j in range(numatom):
                 atomlabel.append(data[j].split()[0])
@@ -164,7 +164,6 @@ def printpwscfin(nml, card):
 
 
 if __name__ == "__main__":
-    # test
     name = "test/pwscfin_test.in"
     nml, card = readpwscfin(name)
     printpwscfin(nml, card)
