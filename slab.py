@@ -182,7 +182,19 @@ def cart2crys(a, v):
     b = getReciprocal(a)
     w = np.dot(v, b)
 
-    return np.mod(w, [1.0, 1.0, 1.0])
+    return w
+
+
+def normalize_crystal_coordinate(w):
+    w = np.array(w)
+    n, m = w.shape
+    for i in range(n):
+        for j in range(m):
+            if np.isclose(w[i, j], 0.0) or np.isclose(w[i, j], 1.0):
+                w[i, j] = 0.0
+            else:
+                w[i, j] = np.remainder(w[i, j], 1.0)
+    return w
 
 
 def crys2cart(a, w):

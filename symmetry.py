@@ -71,6 +71,7 @@ if __name__ == "__main__":
     else:
         v = card["atomic_positions"]["position"]
         w = slab.cart2crys(a, v)
+    w = slab.normalize_crystal_coordinate(w) 
 
     # n = [1]*32 + [2]*32 + [3]*96
     # s = [1.0]*8 + [-1.0]*16 + [1.0]*8 + [0.0]*128
