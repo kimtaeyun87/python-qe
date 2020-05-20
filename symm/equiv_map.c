@@ -15,20 +15,7 @@ double modulo(double x, double y)
 }
 
 
-void print_2darray(int n, int m, double A[n][m])
-{
-    for (int i = 0; i < n; i++)
-    {
-        for (int j = 0; j < m; j++)
-        {
-            printf("%f ", A[i][j]);
-        }
-        printf("\n");
-    }
-}
-
-
-double* mat3x3_inv(const double* A)
+double* invert_mat33(const double* A)
 {
     double det = 0.0;
 
@@ -57,7 +44,7 @@ double* mat3x3_inv(const double* A)
 }
 
 
-int** get_equiv_atom_map(int M, const double* w, int N, const int* R, const double* t)
+int** get_equiv_atom_map(int M, const double* w, int N, const int* R, const double* t, int i0)
 {
     int* map_I0 = (int*) malloc(sizeof(int)*M*N);
     int* map_I0_count = (int*) malloc(sizeof(int)*M);
@@ -74,7 +61,7 @@ int** get_equiv_atom_map(int M, const double* w, int N, const int* R, const doub
                 w_m[i] = t[3*n+i];
                 for (int j = 0; j < 3; j++)
                 {
-                    w_m[i] += ((double) R[9*n+3*i+j])*w[j];
+                    w_m[i] += ((double) R[9*n+3*i+j])*w[3*i0+j];
                 }
                 w_m[i] = modulo(w_m[i], 1.0);
             }
@@ -120,7 +107,7 @@ int** get_equiv_atom_map(int M, const double* w, int N, const int* R, const doub
                         A[3*i+j] = (double) R[9*n+3*i+j];
                     }
                 }
-                double* A_inv = mat3x3_inv(A);
+                double* A_inv = invert_mat33(A);
 
                 double w_m3[3];
                 for (int i = 0; i < 3; i++)
@@ -173,7 +160,7 @@ int main(int argc, char const *argv[])
     int R[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
     double t[3] = {0.0, 0.0, 0.0};
 
-    int** map = get_equiv_atom_map(M, w, N, R, t);
+    int** map = get_equiv_atom_map(M, w, N, R, t, 0);
 
     for (int m = 0; m < M; m++)
     {

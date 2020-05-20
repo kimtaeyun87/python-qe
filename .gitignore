@@ -251,3 +251,8 @@ paket-files/
 .idea/
 *.sln.iml
 /data
+
+test*
+__pycache__
+*.o
+*.so
