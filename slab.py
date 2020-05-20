@@ -190,8 +190,11 @@ def normalize_crystal_coordinate(w):
     n, m = w.shape
     for i in range(n):
         for j in range(m):
-            if np.isclose(w[i, j], 0.0) or np.isclose(w[i, j], 1.0):
+            if np.isclose(w[i, j], 0.0):
                 w[i, j] = 0.0
+            elif np.isclose(w[i, j], 1.0):
+                w[i, j] = 0.0
+                #w[i, j] = 1.0
             else:
                 w[i, j] = np.remainder(w[i, j], 1.0)
     return w
@@ -338,12 +341,18 @@ def reduceAtom(a, p, L, V):
     W = cart2crys(a, V)
 
     for Li, Wi, Vi in list(zip(L, W, V)):
-        mask = np.isclose(Wi, p1)
-        Wi_ = np.array([p1[x] if mask[x] else Wi[x] for x in range(3)])
+        Wi_ = np.zeros(3)
+        for j in range(3):
+            if np.isclose(p1[j], Wi[j]):
+                Wi_[j] = p1[j]
+            elif np.isclose(p2[j], Wi[j]):
+                Wi_[j] = p2[j]
+            else:
+                Wi_[j] = Wi[j]
 
         if all(p1 <= Wi_) and all(Wi_ < p2):
             l.append(Li)
-            v.append(Vi)
+            v.append(crys2cart(a, Wi_))
 
     v = np.array(v)
     return l, v
