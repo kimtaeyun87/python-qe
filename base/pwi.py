@@ -1,13 +1,12 @@
-#-*- coding: utf-8 -*-
-
-
 import f90nml
 from collections import namedtuple
 import numpy as np
+import spglib
 
-from base.atom import Atom
-from base.lattice import Lattice
-from base.crystal import Crystal
+from base.atom import Atom, guess_symbol_from_name, get_number_from_symbol
+from base.lattice import Lattice, get_reciprocal
+from base.crystal import Crystal, get_crystal_coordinate
+from symm.equivatom import get_equiv_atom_map
 
 
 AtomicSpecies = namedtuple('AtomicSpecies', 'name, mass, pseudo')
@@ -16,7 +15,7 @@ AtomicForces = namedtuple('AtomicForces', 'name, force')
 CellParameters = namedtuple('CellParameters', 'option, unitcell')
 
 
-class PwInput:
+class Pwin:
     def __init__(self, fpath):
         nml, card = _read_from(fpath)
 
@@ -24,7 +23,7 @@ class PwInput:
         System = namedtuple('System', nml['system'].keys())
         Electrons = namedtuple('Electrons', nml['electrons'].keys())
 
-        # control and system are required
+        # control and system namelists are required
         self.control = Control(**nml['control'])
         self.system = System(**nml['system'])
 
@@ -33,7 +32,7 @@ class PwInput:
         except:
             self.electrons = None
 
-        # atomic_species and atomic_positions are required
+        # atomic_species and atomic_positions cards are required
         self.atomic_species = AtomicSpecies(**card['atomic_species'])
         self.atomic_positions = AtomicPositions(**card['atomic_positions'])
 
@@ -49,90 +48,107 @@ class PwInput:
 
     def get_crystal(self):
         unitcell = self.cell_parameters.unitcell
-        names = self.atomic_positions.name
-        positions = self.atomic_positions.position
+        atomlist_name = self.atomic_positions.name
+        atomlist_position = self.atomic_positions.position
 
         lattice = Lattice(np.array(unitcell))
 
-        atoms = []
-        for name, position in zip(names, positions):
-            atoms.append(Atom(name, np.array(position)))
+        atomlist = []
+        for name, position in zip(atomlist_name, atomlist_position):
+            atomlist.append(Atom(name, np.array(position)))
         
-        return Crystal(lattice, atoms)
+        return Crystal(lattice, atomlist)
 
-    def get_ishubbard(self):
-        ntyp = self.system.ntyp
-        names = self.atomic_species.name
-        hubbard_u = self.system.hubbard_u
+    def get_is_hub(self):
+        num_atomtype = self.system.ntyp
+        atomtype_name = self.atomic_species.name
+        atomtype_hubu = self.system.hubbard_u
 
-        if ntyp < len(hubbard_u):
+        if num_atomtype < len(atomtype_hubu):
             raise ValueError('ntyp must be greater than the number of hubbard atoms.')
         else:
-            ishubbard = {}
-            for i, name in enumerate(names):
+            is_hub = {}
+            for i, name in enumerate(atomtype_name):
                 try:
-                    u = hubbard_u[i]
+                    u = atomtype_hubu[i]
                 except IndexError:
                     u = None
                 if not u:
-                    ishubbard[name] = False
+                    is_hub[name] = False
                 else:
-                    ishubbard[name] = True
+                    is_hub[name] = True
 
-        return ishubbard
+        return is_hub
 
-    def get_nhubbard(self):
-        ishubbard = self.get_ishubbard()
-        names = self.atomic_positions.name
+    def get_num_hub(self):
+        is_hub = self.get_is_hub()
+        atomlist_name = self.atomic_positions.name
 
-        nhubbard = 0
-        for name in names:
-            if ishubbard[name]:
-                nhubbard += 1
+        num_hub = 0
+        for name in atomlist_name:
+            if is_hub[name]:
+                num_hub += 1
 
-        return nhubbard
+        return num_hub
 
     def get_starting_magnetization(self):
-        ntyp = self.system.ntyp
-        names = self.atomic_species.name
+        num_atomtype = self.system.ntyp
+        atomtype_name = self.atomic_species.name
+
         _starting_magnetization = self.system.starting_magnetization
 
-        if ntyp < len(_starting_magnetization):
+        if num_atomtype < len(_starting_magnetization):
             raise ValueError('ntyp must be greater than the number of hubbard atoms.')
         else:
             starting_magnetization = {}
-            for i, name in enumerate(names):
+            for i, name in enumerate(atomtype_name):
                 try:
-                    m = _starting_magnetization[i]
+                    m_i = _starting_magnetization[i]
                 except IndexError:
-                    m = 0.0
+                    m_i = 0.0
 
-                starting_magnetization[name] = m
+                starting_magnetization[name] = m_i
 
         return starting_magnetization
 
-    def get_spglib_cell(self, magnetic=False):
+    def get_spglib_cell(self):
         crystal = self.get_crystal()
 
-        lattice = crystal.lattice
-        unitcell = lattice.unitcell
-        reciprocal = lattice.get_reciprocal(unitcell)
+        unitcell = crystal.lattice.unitcell
+        reciprocal = get_reciprocal(unitcell)
 
-        positions = crystal.get_atom_positions()
-        crystal_coordinates = crystal.get_crystal_coordinates(positions, reciprocal)
+        position = crystal.get_atomlist_position()
+        crystal_coordinate = get_crystal_coordinate(position, reciprocal)
 
         starting_magnetization = self.get_starting_magnetization()
 
-        numbers = []
+        atomic_number = []
         magnetization = []
 
-        for atom in crystal.atoms:
-            symbol = atom.guess_symbol_from_name(atom.name)
-            numbers.append(atom.get_atom_number_from_symbol(symbol))
+        for atom in crystal.atomlist:
+            symbol = guess_symbol_from_name(atom.name)
+            atomic_number.append(get_number_from_symbol(symbol))
             magnetization.append(
                 np.sign(starting_magnetization[atom.name]))
 
-        return unitcell, crystal_coordinates, numbers, magnetization
+        return unitcell, crystal_coordinate, atomic_number, magnetization
+
+    def get_symmetry_data(self):
+        spglib_cell = self.get_spglib_cell()
+        return spglib.get_symmetry(spglib_cell)
+
+    def get_symmetrizing_map(self, index_reference_atom):
+        crystal = self.get_crystal()
+        crystal_coordinate = crystal.get_crystal_coordinate()
+        
+        symmetry_data = self.get_symmetry_data()
+        rotation = symmetry_data["rotations"]
+        translation = symmetry_data["translations"]
+
+        symmetrizing_map = get_equiv_atom_map(
+            crystal_coordinate, rotation, translation, index_reference_atom)
+
+        return symmetrizing_map
 
 
 def _read_from(fpath):
@@ -240,7 +256,7 @@ def _read_from(fpath):
     return nml, card
 
 
-def print_pw_input(nml, card):
+def _print_pw_input(nml, card):
     print(nml)
 
     headform = "\n{:s} {:s}"

@@ -1,7 +1,15 @@
 #-*- coding: utf-8 -*-
+import numpy as np
 
 
 def convert_ns_noncolin(nat, ldim, dir=None):
+    """
+    args:
+        nat: number of atoms.
+        ldim: 2l+1, where l is the orbital angular momentum.
+    returns:
+        none
+    """
     if (dir == None):
         fn = './occup.txt'
     else:

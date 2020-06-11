@@ -1,0 +1,68 @@
+&CONTROL
+    calculation = 'scf'
+    prefix = 'NiO_nc'
+    pseudo_dir = './'
+    outdir = './tmp'
+    verbosity = 'high'
+/
+&SYSTEM
+    ibrav = 0
+    nat = 16
+    ntyp = 3
+    ecutwfc = 40.d0
+    ecutrho = 240.d0
+    occupations = 'smearing'
+    smearing = 'mp'
+    degauss = 0.001d0
+    !nspin = 2
+    noncolin = .true.
+    lspinorb = .false.
+    starting_magnetization(1) =  0.5d0
+    starting_magnetization(2) = -0.5d0
+    starting_magnetization(3) =  0.0d0
+    lda_plus_u = .true.
+    lda_plus_u_kind = 1
+    hubbard_u(1) = 8.d0
+    hubbard_u(2) = 8.d0
+    constrained_magnetization = 'hubbard'
+    lambda = 0.1d0
+    nosym = .true.
+/
+
+&ELECTRONS
+    mixing_beta = 0.3
+    conv_thr = 1.d-13
+    !startingpot = 'file'
+    !startingwfc = 'file'
+/
+
+ATOMIC_SPECIES
+Ni1 58.69 Ni.pz-n-rrkjus_psl.0.1.UPF
+Ni2 58.69 Ni.pz-n-rrkjus_psl.0.1.UPF
+O   16.00 O.pz-n-rrkjus_psl.0.1.UPF
+
+K_POINTS automatic
+2 2 2 0 0 0
+
+CELL_PARAMETERS angstrom
+ 5.94572010       0.00000000       0.00000000
+-2.97286005       5.14914465       0.00000000
+ 5.94572010       3.43276310       4.85466013
+
+ATOMIC_POSITIONS angstrom
+Ni1     2.97286005      -0.00000000      -0.00000000
+Ni1    -1.48643002       2.57457232      -0.00000000
+Ni1     1.48643002       2.57457232      -0.00000000
+Ni1     0.00000000       0.00000000       0.00000000
+Ni2     5.94572010       1.71638155       2.42733007
+Ni2     1.48643002       4.29095387       2.42733007
+Ni2     4.45929007       4.29095387       2.42733007
+Ni2     2.97286005       1.71638155       2.42733007
+O       0.00000000       3.43276310       1.21366503
+O       1.48643002       0.85819077       1.21366503
+O       4.45929007       0.85819077       1.21366503
+O       2.97286005       3.43276310       1.21366503
+O       2.97286005       5.14914465       3.64099510
+O       4.45929007       2.57457232       3.64099510
+O       7.43215012       2.57457232       3.64099510
+O       5.94572010       5.14914465       3.64099510

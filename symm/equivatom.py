@@ -7,13 +7,25 @@ import numpy.ctypeslib as npct
 import os.path
 
 
-def get_equiv_atom_map(w, R, t, i0):
+def get_response_matrix(response_vector, equiv_atom_map):
+    n = len(response_vector)
+    response_matrix = np.zeros((n,n))
+
+    for i in range(n):
+        for j in range(n):
+            num_map = len(equiv_atom_map[i, j])
+            _tmp = 0.0
+            for k in range(num_map):
+                l = equiv_atom_map[i, j, k]
+                _tmp += response_vector[l]
+            response_matrix[i, j] = _tmp/num_map
+    
+    return response_matrix
+
+
+def get_equiv_atom_map(crystal_coordinate, rotation, translation, index_reference_atom):
     """Wrapper for get_equiv_atom_map defined in equiv_map.c
     """
-    Nw = len(w)
-    NR = len(R)
-
-
     libsym = ct.CDLL(os.path.dirname(__file__) + os.path.sep + 'libsymm.so', 
         mode=ct.RTLD_GLOBAL)
 
@@ -27,19 +39,22 @@ def get_equiv_atom_map(w, R, t, i0):
 
     libsym.get_equiv_atom_map.restype = ct.POINTER(ct.POINTER(ct.c_int))
 
-    _equiv_atom_map = libsym.get_equiv_atom_map(Nw, w, NR, R, t, i0)
+    _equiv_atom_map = libsym.get_equiv_atom_map(
+        len(crystal_coordinate), crystal_coordinate, len(rotation), rotation, 
+        translation, index_reference_atom)
 
-    map_count = npct.as_array(_equiv_atom_map[0], (Nw,))
+    map_count = npct.as_array(_equiv_atom_map[0], (len(crystal_coordinate),))
     max_count = max(map_count)
 
-    equiv_atom_map = npct.as_array(_equiv_atom_map[1], (Nw,Nw,max_count))
+    equiv_atom_map = npct.as_array(
+        _equiv_atom_map[1], (len(crystal_coordinate),len(crystal_coordinate),max_count))
 
     return equiv_atom_map
 
 
 """
 # python implementation as a reference
-def _get_map_IJ_to_I0(Nw, w, NR, R, t, I0=0):
+def _get_equiv_atom_map(crystal_coordinates, rotations, translations, i0=0):
     # Nw: number of atoms.
     # w: atomic positions in crystal coordinate.
     # NR: number of symmetry operations.

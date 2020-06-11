@@ -5,11 +5,157 @@ import copy
 import numpy as np
 
 
+atomsymtonum = {
+    "H": 1, "He": 2, "Li": 3, "Be": 4, "B": 5, "C": 6, "N": 7, "O": 8, "F": 9, "Ne": 10,
+    "Na": 11, "Mg": 12, "Al": 13, "Si": 14, "P": 15, "S": 16, "Cl": 17, "Ar":18, "K": 19, "Ca": 20,
+    "Sc": 21, "Ti": 22, "V": 23, "Cr": 24, "Mn": 25, "Fe": 26, "Co": 27, "Ni": 28, "Cu": 29, "Zn": 30,
+    "Ga": 31, "Ge": 32, "As": 33, "Se": 34, "Br": 35, "Kr": 36, "Rb": 37, "Sr": 38, "Y": 39, "Zr": 40,
+    "Nb": 41, "Mo": 42, "Tc": 43, "Ru": 44, "Rh": 45, "Pd": 46, "Ag": 47, "Cd": 48, "In": 49, "Sn": 50,
+    "Sb": 51, "Te": 52, "I": 53, "Xe": 54, "Cs": 55, "Ba": 56, "La": 57, "Ce": 58, "Pr": 59, "Nd": 60,
+    "Pm": 61, "Sm": 62, "Eu": 63, "Gd": 64, "Tb": 65, "Dy": 66, "Ho": 67, "Er": 68, "Tm": 69, "Yb": 70,
+    "Lu": 71, "Hf": 72, "Ta": 72, "W": 74, "Re": 75, "Os": 76, "Ir": 77, "Pt": 78, "Au": 79, "Hg": 80,
+    "Tl": 81, "Pb": 82, "Bi": 83, "Po": 84, "At": 85, "Rn": 86, "Fr": 87, "Ra": 88, "Ac": 89, "Th": 90,
+    "Pa": 91, "U": 92, "Np": 93, "Pu": 94
+    }
+
+
+def celldm2cell(celldm):
+    A, B, C = celldm[:3]
+    degtorad = np.pi/180.0
+    alpha, beta, gamma = [x*degtorad for x in celldm[3:]]
+
+    a = np.zeros((3, 3))
+
+    a[0, :] = [A, 0.0, 0.0]
+    a[1, :] = [B*np.cos(gamma), B*np.sin(gamma), 0.0]
+    a[2, :] = [C*np.cos(beta),
+               C*(np.cos(alpha) - np.cos(beta)*np.cos(gamma))/np.sin(gamma),
+               C*np.sqrt(
+                   1.0 + 2.0*np.cos(alpha)*np.cos(beta)*np.cos(gamma) -
+                   np.cos(alpha)**2 - np.cos(beta)**2 - np.cos(gamma)**2
+               )/np.sin(gamma)]
+    return a
+
+
+def cell2celldm(a):
+    A, B, C = [np.linalg.norm(a[i, :]) for i in range(3)]
+
+    cosbc = np.dot(a[1, :]/B, a[2, :]/C)
+    cosac = np.dot(a[0, :]/A, a[2, :]/C)
+    cosab = np.dot(a[0, :]/A, a[1, :]/B)
+
+    radtodeg = 180.0/np.pi
+
+    alpha = np.arccos(cosbc)*radtodeg
+    beta  = np.arccos(cosac)*radtodeg
+    gamma = np.arccos(cosab)*radtodeg
+
+    return [A, B, C, alpha, beta, gamma]
+
+
+def standardizeCell(a):
+    celldm = cell2celldm(a)
+    return celldm2cell(celldm)
+
+
+def getReciprocal(a):
+    a = np.array(a)
+    V = np.linalg.det(a)
+    if V < 0: raise ValueError("det(a) < 0")
+
+    b = np.zeros((3, 3))
+    b[:, 0] = np.cross(a[1, :], a[2, :])
+    b[:, 1] = np.cross(a[2, :], a[0, :])
+    b[:, 2] = np.cross(a[0, :], a[1, :])
+
+    return b/V
+
+
 def getGvector(a, g):
     a = np.array(a)
     g = np.array(g, dtype=int)
     b = getReciprocal(a)
     return np.dot(b, g)
+
+
+def readVestaxtl(fpath):
+    with open(fpath) as f:
+        if f.readline().split()[0] != "TITLE":
+            raise ValueError
+        if f.readline().strip() != "CELL":
+            raise ValueError
+        celldm = [float(x) for x in f.readline().split()]
+        symnum   = int(f.readline().split()[-1])
+        symlabel = f.readline().split()[-1]
+        if f.readline().strip() != "ATOMS":
+            raise ValueError
+        line = f.readline()
+        if not all([x in line for x in ["NAME", "X", "Y", "Z"]]):
+            raise ValueError
+        atomlabel = []
+        atompos   = []
+        while True:
+            namepos = f.readline().split()
+            if namepos[0] == "EOF": break
+            atomlabel.append(namepos[0])
+            atompos.append([float(x) for x in namepos[1:]])
+        atompos = np.array(atompos)
+        atompos = np.mod(atompos, [1.0, 1.0, 1.0])
+
+    cell = celldm2cell(celldm)
+
+    card = {}
+    card["cell_parameters"] = {"option": "angstrom", "cell": cell}
+    card["atomic_positions"] = {"option": "crystal", "position": atompos, "label": atomlabel}
+
+    return card
+
+
+def writexsf(f, a, l, v, mode="crystal"):
+    """ Write a xsf (xcrysden) file
+
+    Args:
+
+        f: File object
+
+        a (3x3 array): Primitive cell
+           [a1x, a1y, a1z]
+           [a2x, a2y, a2z]
+           [a3x, a3y, a3z]
+
+        l (list): Atom label
+
+        v (nx3 array): Atomic positions in Cartesian coordinate
+           [v1x, v1y, v1z]
+           [v2x, v2y, v2z]
+                  :
+                  :
+           [vnx, vny, vnz]
+
+        mode: "crystal", "slab", "polymer", "dot". Default to "crystal"
+
+    See also:
+        all coordinates in cartesian coordinate
+    """
+    f.write(f"{mode.upper():s}\n")
+    f.write("PRIMVEC\n")
+
+    for i in range(3):
+        x, y, z = a[i, :]
+        f.write(f"{x:16.8f}{y:16.8f}{z:16.8f}\n")
+
+    f.write("CONVVEC\n")
+
+    for i in range(3):
+        x, y, z = a[i, :]
+        f.write(f"{x:16.8f}{y:16.8f}{z:16.8f}\n")
+
+    f.write("PRIMCOORD\n")
+    f.write(f"{len(v):4d} 1\n")
+
+    for i in range(len(v)):
+        x, y, z = v[i, :]
+        f.write(f"{atomsymtonum[l[i]]:4d}{x:16.8f}{y:16.8f}{z:16.8f}\n")
 
 
 def cart2crys(a, v):

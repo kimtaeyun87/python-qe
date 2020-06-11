@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <mkl.h>
 
+// void invert_mat33(const double a[3][3], double b[3][3]);
+
 
 double modulo(double x, double y)
 {
@@ -151,21 +153,3 @@ int** get_equiv_atom_map(int M, const double* w, int N, const int* R, const doub
     return map;
 }
 
-
-int main(int argc, char const *argv[])
-{
-    int M = 1, N = 1;
-
-    double w[3] = {0.0, 0.0, 0.0};
-    int R[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-    double t[3] = {0.0, 0.0, 0.0};
-
-    int** map = get_equiv_atom_map(M, w, N, R, t, 0);
-
-    for (int m = 0; m < M; m++)
-    {
-        printf("COUNT: %d, IJ: %d\n", map[0][m], map[1][m]);
-    }
-
-    return 0;
-}

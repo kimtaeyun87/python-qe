@@ -1,15 +1,14 @@
-#-*- coding: utf-8 -*-
 
 import numpy as np
 
 from base.atom import Atom
-from base.lattice import Lattice
+from base.lattice import Lattice, get_reciprocal
 
 
 class Crystal:
-    def __init__(self, lattice, atoms):
+    def __init__(self, lattice, atomlist):
         self.lattice = lattice
-        self.atoms = atoms
+        self.atomlist = atomlist
 
     @property
     def lattice(self):
@@ -22,36 +21,47 @@ class Crystal:
         self._lattice = lattice
 
     @property
-    def atoms(self):
-        return self._atoms
+    def atomlist(self):
+        return self._atomlist
 
-    @atoms.setter
-    def atoms(self, atoms):
-        if not isinstance(atoms, list):
-            raise TypeError('atoms must be a \'list\' of instances of Atom.')
-        if not all(map(lambda atom: isinstance(atom, Atom), atoms)):
-            raise TypeError('atoms must be a list of \'instances of Atom\'.')
-        self._atoms = atoms
+    @atomlist.setter
+    def atomlist(self, atomlist):
+        if not isinstance(atomlist, list):
+            raise TypeError('atomlist must be a \'list\'.')
+        if not all(map(lambda atom: isinstance(atom, Atom), atomlist)):
+            raise TypeError('atom in atomlist must be a \'instance of Atom\'.')
+        self._atomlist = atomlist
 
-    def get_atom_names(self):
-        names = []
-        for atom in self.atoms:
-            names.append(atom.name)
-        return np.array(names)
+    def get_atomlist_position(self):
+        atomlist_position = []
+        for atom in self.atomlist:
+            atomlist_position.append(atom.position)
+        return np.array(atomlist_position)
+    
+    def get_atomlist_name(self):
+        atomlist_name = []
+        for atom in self.atomlist:
+            atomlist_name.append(atom.name)
+        return atomlist_name
 
-    def get_atom_positions(self):
-        positions = []
-        for atom in self.atoms:
-            positions.append(atom.position)
-        return np.array(positions)
+    def get_atomlist_as_tuplelist(self):
+        atomlist_name = self.get_atomlist_name
+        atomlist_position = self.get_atomlist_position
+        return zip(atomlist_name, atomlist_position)
 
-    @staticmethod
-    def get_crystal_coordinates(positions, reciprocal):
-        if not isinstance(positions, np.ndarray):
-            raise TypeError('positions must be an ndarray.')
-        if not isinstance(reciprocal, np.ndarray):
-            raise TypeError('reciprocal must be an ndarray.')
-        if reciprocal.shape != (3,3):
-            raise TypeError('reciprocal must be an array of shape (3,3).')
-        return np.dot(positions, reciprocal)
+    def get_crystal_coordinate(self):
+        unitcell = self.lattice.unitcell
+        reciprocal = get_reciprocal(unitcell)
+        position = self.get_atomlist_position()
+        return np.dot(position, reciprocal)
+
+
+def get_crystal_coordinate(position, reciprocal):
+    if not isinstance(position, np.ndarray):
+        raise TypeError('positions must be an ndarray.')
+    if not isinstance(reciprocal, np.ndarray):
+        raise TypeError('reciprocal must be an ndarray.')
+    if reciprocal.shape != (3,3):
+        raise TypeError('reciprocal must be an array of shape (3,3).')
+    return np.dot(position, reciprocal)
 

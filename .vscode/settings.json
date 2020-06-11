@@ -1,0 +1,9 @@
+{
+    "python.pythonPath": "/home/kimtaeyun/.conda/envs/devel/bin/python",
+    "python.linting.enabled": true,
+    "files.associations": {
+        "math.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "Disabled",
+    "python.linting.pylintEnabled": true
+}
